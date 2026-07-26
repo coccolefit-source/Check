@@ -1,0 +1,906 @@
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>CHECK — Tactical Habit Tracker</title>
+  <meta name="theme-color" content="#0A0D14" />
+  <meta name="background-color" content="#0A0D14" />
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Canvas Confetti CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            tactical: {
+              bg: '#0A0D14',
+              panel: '#101827',
+              cyan: '#00F0FF',
+              amber: '#FFB800',
+              green: '#00FFCC',
+              border: 'rgba(6, 182, 212, 0.3)',
+            }
+          },
+          fontFamily: {
+            mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
+            sans: ['system-ui', '-apple-system', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=JetBrains+Mono:wght@400;700;800&display=swap');
+    
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: #0A0D14;
+      color: #F1F5F9;
+      overflow-x: hidden;
+    }
+
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Fondo de cuadrícula HUD cibernética */
+    .hud-bg-grid {
+      background-image: 
+        linear-gradient(to right, rgba(0, 240, 255, 0.04) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(0, 240, 255, 0.04) 1px, transparent 1px);
+      background-size: 32px 32px;
+    }
+
+    /* Resplandor neón para títulos y textos monumentales */
+    .glow-cyan {
+      text-shadow: 0 0 15px rgba(0, 240, 255, 0.7), 0 0 30px rgba(0, 240, 255, 0.4);
+    }
+    .glow-green {
+      text-shadow: 0 0 20px #00FFCC, 0 0 40px #00FFCC;
+    }
+
+    /* Trofeo flotante sin recuadro con drop shadow radiante dorado */
+    .trophy-floating {
+      filter: drop-shadow(0 0 25px rgba(255, 184, 0, 0.9)) drop-shadow(0 0 45px rgba(0, 240, 255, 0.5));
+      animation: trophyFloat 3s ease-in-out infinite alternate;
+    }
+    @keyframes trophyFloat {
+      0% { transform: translateY(0px) scale(1); }
+      100% { transform: translateY(-8px) scale(1.05); }
+    }
+
+    /* Animación de entrada con rebote para modal de victoria */
+    .modal-backdrop {
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+    .modal-backdrop.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .modal-box {
+      transform: scale(0.5) translateY(50px);
+      opacity: 0;
+      transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.4s ease;
+    }
+    .modal-backdrop.active .modal-box {
+      transform: scale(1) translateY(0);
+      opacity: 1;
+    }
+
+    /* Barras de progreso animadas en vivo */
+    .progress-bar-transition {
+      transition: width 1s ease-out;
+    }
+
+    /* Ocultar scrollbar de filtros pero mantener scroll */
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+<body class="bg-[#0A0D14] text-slate-100 hud-bg-grid min-h-screen selection:bg-[#00F0FF] selection:text-slate-950">
+
+  <!-- ================= VISTA PRINCIPAL (RESPONSIVE DASHBOARD) ================= -->
+  <div class="flex flex-col md:flex-row min-h-screen relative">
+    
+    <!-- CABECERA MÓVIL (Solo visible en pantallas < 768px) -->
+    <header class="md:hidden sticky top-0 z-[50] bg-[#0A0D14]/90 border-b border-[#06B6D4]/30 backdrop-blur-md p-3.5 flex items-center justify-between font-mono">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-xl bg-[#06B6D4]/15 border border-[#00F0FF]/40 flex items-center justify-center text-[#00F0FF] shadow-[0_0_10px_rgba(0,240,255,0.25)]">
+          <i data-lucide="target" class="w-5 h-5 text-[#00F0FF]"></i>
+        </div>
+        <div>
+          <span class="font-bold tracking-wider text-sm block text-white">CHECK</span>
+          <span class="text-[9px] text-[#00F0FF] tracking-widest uppercase block -mt-1 font-semibold">TACTICAL HUD</span>
+        </div>
+      </div>
+      
+      <div class="flex items-center gap-2">
+        <div class="flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-mono font-bold">
+          <i data-lucide="flame" class="w-3.5 h-3.5 fill-amber-400/20"></i>
+          <span id="mobile-streak-count">7d</span>
+        </div>
+        <button id="hamburger-btn" class="p-1.5 rounded-xl bg-[#101827] border border-[#06B6D4]/30 text-slate-200 hover:border-[#00F0FF] transition-colors">
+          <i data-lucide="menu" class="w-5 h-5"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- BACKDROP PARA MENÚ LATERAL EN MÓVIL -->
+    <div id="sidebar-backdrop" class="fixed inset-0 bg-[#0A0D14]/85 backdrop-blur-sm z-[998] hidden md:hidden transition-opacity"></div>
+
+    <!-- ================= MENÚ LATERAL / CONSOLA DE MANDO FIJA (TABLET >= 768px) ================= -->
+    <aside id="sidebar" class="fixed md:sticky top-0 left-0 z-[1000] h-screen w-[260px] shrink-0 bg-[#0A0D14]/95 md:bg-[#0A0D14]/90 border-r border-[#06B6D4]/30 p-4 md:p-5 pb-[80px] overflow-y-auto flex flex-col justify-between transition-transform duration-300 backdrop-blur-xl -translate-x-full md:translate-x-0">
+      <div class="space-y-6">
+        <!-- Brand Ident / Logo -->
+        <div class="flex items-center justify-between pb-4 border-b border-[#06B6D4]/20">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-[#06B6D4]/15 border border-[#00F0FF]/40 flex items-center justify-center text-[#00F0FF] shadow-[0_0_15px_rgba(0,240,255,0.3)]">
+              <i data-lucide="shield-check" class="w-6 h-6 text-[#00F0FF]"></i>
+            </div>
+            <div>
+              <span class="font-extrabold tracking-wider text-base text-white font-mono block">CHECK</span>
+              <span class="text-[10px] text-[#00F0FF] tracking-widest uppercase block font-mono">TACTICAL OS v2.5</span>
+            </div>
+          </div>
+          <button id="close-sidebar-btn" class="md:hidden p-1.5 rounded-xl bg-[#101827] border border-[#06B6D4]/30 text-slate-400 hover:text-white">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <!-- Perfil Operador & Nivel XP -->
+        <div class="bg-[#101827] p-3.5 rounded-2xl border border-[#06B6D4]/30 shadow-[0_0_15px_rgba(6,182,212,0.1)] space-y-3 font-mono">
+          <div class="flex items-center gap-3">
+            <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-[#00F0FF]/20 to-blue-500/20 border border-[#00F0FF]/50 flex items-center justify-center text-white font-bold text-lg shadow-[0_0_10px_rgba(0,240,255,0.2)]">
+              <i data-lucide="user" class="w-6 h-6 text-[#00F0FF]"></i>
+            </div>
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-slate-100 truncate">COMANDANTE</span>
+                <span id="user-level-badge" class="text-[10px] px-1.5 py-0.5 bg-[#00F0FF]/20 text-[#00F0FF] font-bold rounded border border-[#00F0FF]/40">LVL 5</span>
+              </div>
+              <span class="text-[10px] text-slate-400 block mt-0.5">OPERADOR ÉLITE</span>
+            </div>
+          </div>
+
+          <!-- Barra de XP en Sidebar -->
+          <div class="space-y-1">
+            <div class="flex justify-between text-[10px] text-slate-300">
+              <span>PROGRESO XP</span>
+              <span id="sidebar-xp-text" class="text-[#00F0FF] font-bold">450 / 600 XP</span>
+            </div>
+            <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden p-0.5 border border-slate-700">
+              <div id="sidebar-xp-bar" class="bg-gradient-to-r from-[#00F0FF] to-[#00FFCC] h-full rounded-full progress-bar-transition" style="width: 75%;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Menú de Navegación -->
+        <nav class="space-y-1.5 font-mono text-xs">
+          <span class="text-[10px] text-slate-500 font-bold uppercase tracking-wider px-3 block mb-2">MÓDULOS TÁCTICOS</span>
+          <a href="#" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl bg-[#00F0FF]/15 text-[#00F0FF] border border-[#00F0FF]/40 font-bold shadow-[0_0_12px_rgba(0,240,255,0.2)]">
+            <i data-lucide="check-square" class="w-4 h-4"></i>
+            <span>Daily Tracker (Hoy)</span>
+          </a>
+          <a href="#" onclick="alert('Módulo de Proyectos Activo en el panel central'); return false;" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-300 hover:bg-slate-800/60 hover:text-white transition-colors">
+            <i data-lucide="briefcase" class="w-4 h-4 text-slate-400"></i>
+            <span>Proyectos y Metas</span>
+          </a>
+          <a href="#" onclick="alert('Historial Táctico sincronizado en almacenamiento local'); return false;" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-300 hover:bg-slate-800/60 hover:text-white transition-colors">
+            <i data-lucide="bar-chart-2" class="w-4 h-4 text-slate-400"></i>
+            <span>Analítica y Racha</span>
+          </a>
+        </nav>
+      </div>
+
+      <!-- Footer del Sidebar -->
+      <div class="pt-4 border-t border-[#06B6D4]/20 space-y-3 font-mono text-xs">
+        <div class="flex items-center justify-between px-3 py-2 bg-slate-900/80 rounded-xl border border-slate-800">
+          <span class="text-slate-400 flex items-center gap-1.5">
+            <i data-lucide="shield" class="w-3.5 h-3.5 text-[#00FFCC]"></i> Estado:
+          </span>
+          <span class="text-[#00FFCC] font-bold">100% SECURE</span>
+        </div>
+        <button onclick="alert('Modo PWA Offline Activo. Puedes añadir esta página a tu pantalla de inicio.');" class="w-full py-2.5 px-3 bg-[#101827] hover:bg-slate-800 border border-[#06B6D4]/40 rounded-xl text-[#00F0FF] font-bold flex items-center justify-center gap-2 transition-all shadow-sm">
+          <i data-lucide="download" class="w-4 h-4"></i>
+          <span>Instalar PWA</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- ================= CONTENIDO CENTRAL (DASHBOARD 2 COLUMNAS >= 768px) ================= -->
+    <main class="flex-1 p-3.5 md:p-6 lg:p-8 max-w-7xl mx-auto w-full min-w-0 space-y-5 md:space-y-6">
+      
+      <!-- Top Tactical Banner / Cabecera HUD -->
+      <header class="bg-[#101827]/90 p-4 md:p-5 rounded-2xl border border-[#06B6D4]/30 shadow-[0_0_20px_rgba(6,182,212,0.1)] backdrop-blur-md relative overflow-hidden font-mono flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div class="absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-[#00F0FF]"></div>
+        <div class="absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-[#00F0FF]"></div>
+        <div class="absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 border-[#00F0FF]"></div>
+        <div class="absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-[#00F0FF]"></div>
+
+        <div>
+          <div class="flex items-center gap-2 text-xs font-bold text-[#00F0FF] uppercase tracking-wider mb-1">
+            <span class="w-2 h-2 rounded-full bg-[#00F0FF] animate-ping"></span>
+            <span>OPERACIÓN EN CURSO // PROTOCOLO ACTIVO</span>
+          </div>
+          <h1 id="current-date-title" class="text-lg md:text-xl font-bold text-white tracking-wide">HOY — MISIÓN DIARIA</h1>
+        </div>
+
+        <!-- Indicador de Progreso Rápido HUD -->
+        <div class="flex items-center gap-4 bg-[#0A0D14] px-4 py-2.5 rounded-xl border border-slate-800">
+          <div class="text-right">
+            <span class="text-[10px] text-slate-400 block uppercase font-bold">CUMPLIMIENTO</span>
+            <span id="header-progress-text" class="text-base font-extrabold text-[#00F0FF]">0%</span>
+          </div>
+          <div class="w-12 h-12 rounded-full border-4 border-slate-800 flex items-center justify-center relative">
+            <i data-lucide="crosshair" class="w-5 h-5 text-[#00F0FF] animate-spin" style="animation-duration: 10s;"></i>
+          </div>
+        </div>
+      </header>
+
+      <!-- CUADRÍCULA DE DASHBOARD RESPONSIVE (1 COL EN MÓVIL, 2 COLS EN TABLET/DESKTOP >= 768px) -->
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-5 md:gap-6 items-start">
+        
+        <!-- COLUMNA IZQUIERDA (7 COLS): TAREAS DEL DÍA Y HÁBITOS -->
+        <div class="md:col-span-7 space-y-5 md:space-y-6 min-w-0">
+          
+          <!-- Filtros por Categoría -->
+          <div class="flex items-center justify-between gap-2 bg-[#101827] p-2.5 rounded-xl border border-slate-800 overflow-x-auto no-scrollbar font-mono text-xs">
+            <button onclick="filterTasks('ALL')" class="filter-btn active px-3 py-1.5 rounded-lg font-bold bg-[#00F0FF] text-slate-950 shadow-[0_0_10px_rgba(0,240,255,0.4)] transition-all">TODOS</button>
+            <button onclick="filterTasks('MENTE')" class="filter-btn px-3 py-1.5 rounded-lg font-semibold text-slate-300 hover:bg-slate-800 transition-all">🧠 MENTE</button>
+            <button onclick="filterTasks('CUERPO')" class="filter-btn px-3 py-1.5 rounded-lg font-semibold text-slate-300 hover:bg-slate-800 transition-all">💪 CUERPO</button>
+            <button onclick="filterTasks('TRABAJO')" class="filter-btn px-3 py-1.5 rounded-lg font-semibold text-slate-300 hover:bg-slate-800 transition-all">💼 TRABAJO</button>
+            <button onclick="filterTasks('DEPORTE')" class="filter-btn px-3 py-1.5 rounded-lg font-semibold text-slate-300 hover:bg-slate-800 transition-all">🚴 DEPORTE</button>
+          </div>
+
+          <!-- Barra de Progreso Global -->
+          <div class="bg-[#101827] p-4 rounded-xl border border-slate-800 space-y-2 font-mono">
+            <div class="flex justify-between text-xs font-bold">
+              <span class="text-slate-300 flex items-center gap-1.5">
+                <i data-lucide="zap" class="w-4 h-4 text-amber-400"></i> PROGRESO DIARIO TÁCTICO
+              </span>
+              <span id="progress-bar-label" class="text-[#00F0FF]">0 / 4 COMPLETADOS</span>
+            </div>
+            <div class="w-full bg-slate-900 h-3 rounded-full overflow-hidden p-0.5 border border-slate-800">
+              <div id="main-progress-bar" class="bg-gradient-to-r from-[#00F0FF] via-[#00FFCC] to-[#FFB800] h-full rounded-full progress-bar-transition shadow-[0_0_12px_rgba(0,240,255,0.5)]" style="width: 0%;"></div>
+            </div>
+          </div>
+
+          <!-- Lista de Tareas para Hoy -->
+          <div class="bg-[#101827] p-4 md:p-5 rounded-2xl border border-slate-800 space-y-3">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800 font-mono">
+              <span class="text-sm font-bold text-slate-200 flex items-center gap-2">
+                <i data-lucide="list-todo" class="w-4 h-4 text-[#00F0FF]"></i> Objetivos Activos
+              </span>
+              <button onclick="openAddTaskModal()" class="px-2.5 py-1 bg-[#00F0FF]/20 hover:bg-[#00F0FF]/30 text-[#00F0FF] border border-[#00F0FF]/40 rounded-lg text-xs font-bold flex items-center gap-1 transition-all">
+                <i data-lucide="plus" class="w-3.5 h-3.5"></i> Nueva Tarea
+              </button>
+            </div>
+
+            <!-- Contenedor dinámico de tareas -->
+            <div id="tasks-container" class="space-y-2.5">
+              <!-- Las tareas se generarán aquí via JS -->
+            </div>
+          </div>
+
+        </div>
+
+        <!-- COLUMNA DERECHA (5 COLS): FOCUS TÁCTICO, DEPORTE & VICTORIAS -->
+        <div class="md:col-span-5 space-y-5 md:space-y-6 min-w-0">
+          
+          <!-- 4. TARJETA "FOCUS TÁCTICO" -->
+          <div class="bg-[#101827] p-5 rounded-2xl border-2 border-[#00F0FF]/40 shadow-[0_0_25px_rgba(0,240,255,0.15)] relative overflow-hidden font-mono">
+            <div class="absolute top-0 right-0 w-24 h-24 bg-[#00F0FF]/5 rounded-full blur-xl pointer-events-none"></div>
+            
+            <div class="flex flex-col gap-4 border-b border-slate-800 pb-4">
+              <div class="flex items-center gap-3">
+                <div class="p-3 rounded-xl bg-[#00F0FF]/15 border border-[#00F0FF]/40 text-[#00F0FF] shadow-[0_0_12px_rgba(0,240,255,0.2)]">
+                  <i id="focus-clock-icon" data-lucide="clock" class="w-6 h-6"></i>
+                </div>
+                <div>
+                  <h2 class="text-base md:text-lg font-extrabold tracking-wider text-white">FOCUS TÁCTICO</h2>
+                  <span class="text-[10px] text-[#00F0FF] tracking-widest block font-semibold">CRONÓMETRO DE ALTA CONCENTRACIÓN</span>
+                </div>
+              </div>
+
+              <!-- Selector de tiempo personalizado con input numérico directo -->
+              <div class="flex flex-wrap items-center justify-between gap-3 shrink-0 pt-1 bg-[#0A0D14] p-2.5 rounded-xl border border-slate-800">
+                <label for="focus-min-input" class="text-xs font-bold text-[#00F0FF] tracking-wider uppercase flex items-center gap-1.5">
+                  <i data-lucide="sliders" class="w-3.5 h-3.5"></i> MINUTOS DE ENFOQUE:
+                </label>
+                <div class="flex items-center gap-1.5">
+                  <input 
+                    type="number" 
+                    id="focus-min-input" 
+                    value="25" 
+                    min="1" 
+                    max="180" 
+                    class="w-16 bg-slate-900 border border-[#00F0FF]/60 rounded-lg py-1 px-2 text-center font-black text-base text-white focus:outline-none focus:border-[#00FFCC] focus:ring-1 focus:ring-[#00FFCC] transition-all"
+                  />
+                  <span class="text-xs text-slate-400 font-bold">MIN</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Pantalla central del temporizador -->
+            <div class="my-6 flex flex-col items-center justify-center">
+              <div id="focus-timer-display" class="text-5xl sm:text-6xl md:text-6xl lg:text-7xl font-black tracking-widest font-mono text-white glow-cyan transition-all duration-300">
+                25:00
+              </div>
+              <span id="focus-status-text" class="text-xs text-slate-400 mt-2 font-semibold uppercase tracking-widest">LISTO PARA INICIAR</span>
+            </div>
+
+            <!-- Botones de Acción -->
+            <div class="flex items-center gap-3">
+              <button id="focus-start-btn" onclick="toggleFocusTimer()" class="flex-1 py-3 px-4 bg-gradient-to-r from-[#00F0FF] to-[#00FFCC] text-slate-950 font-black text-sm rounded-xl shadow-[0_0_20px_rgba(0,240,255,0.4)] hover:shadow-[0_0_30px_rgba(0,240,255,0.7)] hover:scale-[1.02] active:scale-[0.98] transition-all whitespace-nowrap flex items-center justify-center gap-2">
+                ▶ [ INICIAR FOCUS ]
+              </button>
+              <button onclick="resetFocusTimer()" class="p-3 bg-[#0A0D14] border border-slate-700 hover:border-slate-500 rounded-xl text-slate-300 hover:text-white transition-colors" title="Reiniciar Cronómetro">
+                <i data-lucide="rotate-ccw" class="w-5 h-5"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- 3. MÓDULO "DEPORTE Y KILOMETRAJE" -->
+          <div class="bg-[#101827] p-5 rounded-2xl border border-slate-800 shadow-md font-mono space-y-4">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div class="flex items-center gap-2.5">
+                <div class="p-2 rounded-lg bg-[#00F0FF]/15 text-[#00F0FF] border border-[#00F0FF]/30">
+                  <i data-lucide="bike" class="w-5 h-5"></i>
+                </div>
+                <span class="text-sm font-bold text-slate-100">Deporte y Kilometraje</span>
+              </div>
+              <span id="sports-summary-badge" class="text-xs font-extrabold text-[#00F0FF] bg-[#00F0FF]/15 px-3 py-1 rounded-full border border-[#00F0FF]/40 shadow-[0_0_10px_rgba(0,240,255,0.2)]">
+                0.0 km · 0 min hoy
+              </span>
+            </div>
+
+            <!-- Campos numéricos para distancia y duración -->
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label for="sports-km" class="text-[10px] text-slate-400 font-bold block mb-1 uppercase">DISTANCIA (KM)</label>
+                <div class="relative">
+                  <input 
+                    type="number" 
+                    id="sports-km" 
+                    step="0.1" 
+                    placeholder="0.0" 
+                    class="w-full bg-[#0A0D14] border border-slate-700 rounded-xl py-2 px-3 text-sm font-bold text-white focus:outline-none focus:border-[#00F0FF] transition-colors pr-10"
+                  />
+                  <span class="absolute right-3 top-2.5 text-xs text-slate-500 font-bold">KM</span>
+                </div>
+              </div>
+
+              <div>
+                <label for="sports-time" class="text-[10px] text-slate-400 font-bold block mb-1 uppercase">DURACIÓN</label>
+                <div class="relative">
+                  <input 
+                    type="number" 
+                    id="sports-time" 
+                    placeholder="0" 
+                    class="w-full bg-[#0A0D14] border border-slate-700 rounded-xl py-2 px-3 text-sm font-bold text-white focus:outline-none focus:border-[#00F0FF] transition-colors pr-12"
+                  />
+                  <span class="absolute right-3 top-2.5 text-xs text-[#00F0FF] font-bold">MIN</span>
+                </div>
+              </div>
+            </div>
+
+            <button onclick="saveSportsData()" class="w-full py-2.5 px-4 bg-slate-900 hover:bg-[#00F0FF]/20 border border-slate-700 hover:border-[#00F0FF] rounded-xl text-xs font-bold text-[#00F0FF] transition-all flex items-center justify-center gap-2 shadow-sm">
+              <i data-lucide="plus-circle" class="w-4 h-4"></i>
+              <span>+ Guardar Deporte</span>
+            </button>
+          </div>
+
+          <!-- Módulo de Victorias Rápido -->
+          <div class="bg-[#101827] p-5 rounded-2xl border border-slate-800 space-y-3 font-mono">
+            <div class="flex items-center gap-2 pb-2 border-b border-slate-800">
+              <i data-lucide="trophy" class="w-4 h-4 text-amber-400"></i>
+              <span class="text-xs font-bold text-slate-200 uppercase tracking-wider">Victorias Registradas Hoy</span>
+            </div>
+            <p id="victory-log-text" class="text-xs text-slate-400 italic">No se han registrado victorias de racha aún hoy. Completa tus objetivos para activar el protocolo de recompensa.</p>
+          </div>
+
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- ================= BANNER MODO INVITADO (Z-INDEX 30, POR DEBAJO DEL SIDEBAR Z-1000) ================= -->
+  <div id="guest-banner" class="fixed bottom-4 right-4 left-4 md:left-auto md:w-[420px] z-30 bg-[#101827]/95 border-2 border-[#00F0FF]/60 rounded-2xl p-4 shadow-[0_0_30px_rgba(0,240,255,0.25)] backdrop-blur-xl flex flex-col sm:flex-row items-center justify-between gap-3 font-mono transition-transform duration-300">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-[#00F0FF]/20 border border-[#00F0FF] flex items-center justify-center text-[#00F0FF] shrink-0">
+        <i data-lucide="cloud-off" class="w-5 h-5"></i>
+      </div>
+      <div>
+        <span class="text-xs font-bold text-white block">MODO INVITADO / OFFLINE</span>
+        <span class="text-[11px] text-slate-400">Tus datos están protegidos en almacenamiento local.</span>
+      </div>
+    </div>
+    <button onclick="document.getElementById('guest-banner').style.display='none'" class="px-3 py-1.5 bg-[#00F0FF] hover:bg-[#00FFCC] text-slate-950 font-black text-xs rounded-xl shadow-md shrink-0 transition-all">
+      ENTENDIDO
+    </button>
+  </div>
+
+  <!-- ================= 1. MODAL DE "MISIÓN CUMPLIDA" (VICTORIA MONUMENTAL) ================= -->
+  <div id="victory-modal-backdrop" class="modal-backdrop fixed inset-0 z-[2000] bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+    <div id="victory-modal-box" class="modal-box w-full max-w-lg rounded-3xl p-[2px] bg-gradient-to-r from-[#00F0FF] via-[#FFB800] to-[#00F0FF] shadow-[0_0_60px_rgba(0,240,255,0.5),0_0_40px_rgba(255,184,0,0.4)] relative font-mono">
+      <div class="w-full bg-[#0A0D14] rounded-[22px] p-6 md:p-8 text-center relative overflow-hidden">
+        
+        <!-- Luz de fondo radiante -->
+        <div class="absolute -top-24 left-1/2 -translate-x-1/2 w-64 h-64 bg-gradient-to-b from-[#00F0FF]/25 via-amber-500/15 to-transparent rounded-full blur-2xl pointer-events-none"></div>
+
+        <!-- ÍCONO DE TROFEO SUPERIOR FLOTANTE LIBRE (64px) CON EFECTO NEÓN DORADO RADIANTE SIN RECUADRO -->
+        <div class="flex justify-center -mt-2 mb-4 relative z-10">
+          <i data-lucide="trophy" class="w-16 h-16 text-[#FFB800] trophy-floating"></i>
+        </div>
+
+        <!-- TÍTULO PRINCIPAL MONUMENTAL (VERDE/CIAN NEÓN #00FFCC, 2REM, EXTRA BOLD, SIN CORCHETES, GLOW) -->
+        <h2 class="text-3xl md:text-4xl font-black text-[#00FFCC] glow-green tracking-wider mb-2">
+          MISIÓN CUMPLIDA
+        </h2>
+
+        <!-- ELIMINADA ETIQUETA STATUS STREAK_SECURED -> Subtítulo limpio motivacional -->
+        <p class="text-xs md:text-sm text-slate-300 font-semibold mb-6">
+          Has conquistado todos los objetivos tácticos de hoy. Tu disciplina ha forjado un nuevo estándar.
+        </p>
+
+        <!-- BARRA DE PROGRESO DE XP Y CONTADOR DEL NIVEL ACTUAL (LVL) -->
+        <div class="bg-[#101827] p-4 rounded-2xl border border-slate-800 space-y-3 mb-6 relative z-10">
+          <div class="flex items-center justify-between text-xs font-extrabold">
+            <span class="text-white flex items-center gap-1.5">
+              <i data-lucide="shield" class="w-4 h-4 text-[#00F0FF]"></i> NIVEL 5 — OPERADOR ÉLITE
+            </span>
+            <span class="text-[#00FFCC] bg-[#00FFCC]/15 px-2 py-0.5 rounded border border-[#00FFCC]/30 animate-pulse">+200 XP GANADOS</span>
+          </div>
+
+          <div class="space-y-1">
+            <div class="flex justify-between text-[11px] text-slate-400 font-bold">
+              <span>PROGRESO DE NIVEL</span>
+              <span id="modal-xp-counter" class="text-[#00F0FF]">400 / 600 XP</span>
+            </div>
+            <!-- Barra de XP con transición suave de 1s -->
+            <div class="w-full bg-slate-900 h-3.5 rounded-full overflow-hidden p-0.5 border border-slate-700">
+              <div id="modal-xp-bar" class="bg-gradient-to-r from-[#00F0FF] via-[#00FFCC] to-[#FFB800] h-full rounded-full progress-bar-transition shadow-[0_0_15px_rgba(0,255,204,0.8)]" style="width: 0%;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Botón para cerrar celebración y continuar -->
+        <button onclick="closeVictoryModal()" class="w-full py-3.5 px-6 bg-gradient-to-r from-[#00F0FF] via-[#00FFCC] to-[#FFB800] text-slate-950 font-black text-sm uppercase tracking-wider rounded-xl shadow-[0_0_25px_rgba(0,240,255,0.5)] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 relative z-10">
+          <i data-lucide="check" class="w-5 h-5 stroke-[3]"></i> CONTINUAR OPERACIÓN
+        </button>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MODAL AÑADIR NUEVA TAREA ================= -->
+  <div id="add-task-modal" class="modal-backdrop fixed inset-0 z-[1500] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="modal-box w-full max-w-md bg-[#101827] border border-[#06B6D4]/40 rounded-2xl p-5 shadow-2xl font-mono">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
+        <span class="text-sm font-bold text-[#00F0FF] flex items-center gap-2">
+          <i data-lucide="plus-circle" class="w-4 h-4"></i> AGREGAR NUEVO OBJETIVO
+        </span>
+        <button onclick="closeAddTaskModal()" class="text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div class="space-y-3">
+        <div>
+          <label class="text-[10px] text-slate-400 font-bold uppercase block mb-1">NOMBRE DE LA TAREA</label>
+          <input type="text" id="new-task-name" placeholder="Ej: Lectura táctica 20 págs..." class="w-full bg-[#0A0D14] border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#00F0FF]" />
+        </div>
+        <div>
+          <label class="text-[10px] text-slate-400 font-bold uppercase block mb-1">CATEGORÍA</label>
+          <select id="new-task-category" class="w-full bg-[#0A0D14] border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#00F0FF]">
+            <option value="MENTE">🧠 MENTE</option>
+            <option value="CUERPO">💪 CUERPO</option>
+            <option value="TRABAJO">💼 TRABAJO</option>
+            <option value="DEPORTE">🚴 DEPORTE</option>
+          </select>
+        </div>
+        <button onclick="addNewTask()" class="w-full mt-4 py-2.5 bg-[#00F0FF] hover:bg-[#00FFCC] text-slate-950 font-black text-xs uppercase rounded-xl shadow-[0_0_15px_rgba(0,240,255,0.4)] transition-all">
+          GUARDAR EN PROTOCOLO
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= LÓGICA DE LA APLICACIÓN INTEGRADA ================= -->
+  <script>
+    // Inicializar Iconos Lucide al cargar el DOM
+    document.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      initApp();
+    });
+
+    // ESTADO DE LA APLICACIÓN
+    let tasks = [
+      { id: '1', title: 'Meditar 10 min — Enfoque mental', category: 'MENTE', completed: false },
+      { id: '2', title: 'Rutina de Calistenia / Gym', category: 'CUERPO', completed: false },
+      { id: '3', title: 'Revisión de Proyectos Prioritarios', category: 'TRABAJO', completed: false },
+      { id: '4', title: 'Carrera / Cardio de resistencia', category: 'DEPORTE', completed: false }
+    ];
+    let currentFilter = 'ALL';
+    let focusTimerInterval = null;
+    let focusTimeRemaining = 25 * 60;
+    let isFocusRunning = false;
+
+    // INICIALIZACIÓN
+    function initApp() {
+      const savedTasks = localStorage.getItem('check_single_tasks');
+      if (savedTasks) tasks = JSON.parse(savedTasks);
+
+      const savedKm = localStorage.getItem('check_sports_km') || '0.0';
+      const savedMin = localStorage.getItem('check_sports_min') || '0';
+      document.getElementById('sports-km').value = savedKm !== '0.0' ? savedKm : '';
+      document.getElementById('sports-time').value = savedMin !== '0' ? savedMin : '';
+      updateSportsBadge(savedKm, savedMin);
+
+      renderTasks();
+      updateProgressUI();
+
+      const hamburgerBtn = document.getElementById('hamburger-btn');
+      const closeSidebarBtn = document.getElementById('close-sidebar-btn');
+      const sidebar = document.getElementById('sidebar');
+      const backdrop = document.getElementById('sidebar-backdrop');
+      const guestBanner = document.getElementById('guest-banner');
+
+      function openMobileSidebar() {
+        sidebar.classList.remove('-translate-x-full');
+        backdrop.classList.remove('hidden');
+        if (guestBanner) guestBanner.style.opacity = '0.2';
+      }
+
+      function closeMobileSidebar() {
+        sidebar.classList.add('-translate-x-full');
+        backdrop.classList.add('hidden');
+        if (guestBanner) guestBanner.style.opacity = '1';
+      }
+
+      if (hamburgerBtn) hamburgerBtn.addEventListener('click', openMobileSidebar);
+      if (closeSidebarBtn) closeSidebarBtn.addEventListener('click', closeMobileSidebar);
+      if (backdrop) backdrop.addEventListener('click', closeMobileSidebar);
+
+      const focusMinInput = document.getElementById('focus-min-input');
+      if (focusMinInput) {
+        focusMinInput.addEventListener('input', (e) => {
+          if (!isFocusRunning) {
+            let val = parseInt(e.target.value, 10);
+            if (isNaN(val) || val < 1) val = 1;
+            if (val > 180) val = 180;
+            focusTimeRemaining = val * 60;
+            updateFocusDisplay();
+          }
+        });
+      }
+
+      const dateEl = document.getElementById('current-date-title');
+      if (dateEl) {
+        const now = new Date();
+        const options = { weekday: 'long', day: 'numeric', month: 'long' };
+        dateEl.textContent = 'HOY — ' + now.toLocaleDateString('es-ES', options).toUpperCase();
+      }
+    }
+
+    // RENDERIZAR TAREAS
+    function renderTasks() {
+      const container = document.getElementById('tasks-container');
+      if (!container) return;
+      container.innerHTML = '';
+
+      const filtered = tasks.filter(t => currentFilter === 'ALL' || t.category === currentFilter);
+
+      if (filtered.length === 0) {
+        container.innerHTML = '<div class="p-6 text-center text-slate-500 text-xs italic">No hay tareas en esta categoría.</div>';
+        return;
+      }
+
+      filtered.forEach(task => {
+        const el = document.createElement('div');
+        el.className = `p-3.5 rounded-xl border transition-all flex items-center justify-between gap-3 ${
+          task.completed 
+            ? 'bg-slate-900/60 border-slate-800 text-slate-400 line-through' 
+            : 'bg-[#0A0D14] border-[#06B6D4]/30 text-white shadow-sm hover:border-[#00F0FF]'
+        }`;
+
+        const catBadgeColors = {
+          'MENTE': 'bg-purple-500/15 text-purple-400 border-purple-500/30',
+          'CUERPO': 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
+          'TRABAJO': 'bg-blue-500/15 text-blue-400 border-blue-500/30',
+          'DEPORTE': 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30'
+        };
+        const badgeColor = catBadgeColors[task.category] || 'bg-slate-800 text-slate-300';
+
+        el.innerHTML = `
+          <div class="flex items-center gap-3 min-w-0 flex-1">
+            <input 
+              type="checkbox" 
+              ${task.completed ? 'checked' : ''} 
+              onchange="toggleTask('${task.id}')"
+              class="w-5 h-5 rounded-md accent-[#00F0FF] cursor-pointer shrink-0" 
+            />
+            <span class="text-sm font-semibold truncate ${task.completed ? 'text-slate-500' : 'text-slate-100'}">${task.title}</span>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <span class="text-[10px] px-2 py-0.5 rounded border font-bold ${badgeColor}">${task.category}</span>
+            <button onclick="deleteTask('${task.id}')" class="text-slate-500 hover:text-red-400 p-1" title="Eliminar">
+              <i data-lucide="trash-2" class="w-4 h-4"></i>
+            </button>
+          </div>
+        `;
+        container.appendChild(el);
+      });
+
+      lucide.createIcons();
+    }
+
+    // FILTRAR TAREAS
+    function filterTasks(cat) {
+      currentFilter = cat;
+      const btns = document.querySelectorAll('.filter-btn');
+      btns.forEach(btn => {
+        if (btn.textContent.includes(cat) || (cat === 'ALL' && btn.textContent === 'TODOS')) {
+          btn.className = 'filter-btn active px-3 py-1.5 rounded-lg font-bold bg-[#00F0FF] text-slate-950 shadow-[0_0_10px_rgba(0,240,255,0.4)] transition-all';
+        } else {
+          btn.className = 'filter-btn px-3 py-1.5 rounded-lg font-semibold text-slate-300 hover:bg-slate-800 transition-all';
+        }
+      });
+      renderTasks();
+    }
+
+    // CAMBIAR ESTADO DE TAREA Y VERIFICAR VICTORIA AL 100%
+    function toggleTask(id) {
+      const task = tasks.find(t => t.id === id);
+      if (task) {
+        task.completed = !task.completed;
+        saveTasks();
+        renderTasks();
+        updateProgressUI();
+
+        const total = tasks.length;
+        const completed = tasks.filter(t => t.completed).length;
+        if (total > 0 && completed === total) {
+          triggerEpicVictoryModal();
+        }
+      }
+    }
+
+    function deleteTask(id) {
+      tasks = tasks.filter(t => t.id !== id);
+      saveTasks();
+      renderTasks();
+      updateProgressUI();
+    }
+
+    function saveTasks() {
+      localStorage.setItem('check_single_tasks', JSON.stringify(tasks));
+    }
+
+    // ACTUALIZAR BARRAS DE PROGRESO EN VIVO
+    function updateProgressUI() {
+      const total = tasks.length;
+      const completed = tasks.filter(t => t.completed).length;
+      const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+      const headerPctEl = document.getElementById('header-progress-text');
+      const barLabelEl = document.getElementById('progress-bar-label');
+      const mainBarEl = document.getElementById('main-progress-bar');
+      const victoryLogEl = document.getElementById('victory-log-text');
+
+      if (headerPctEl) headerPctEl.textContent = `${pct}%`;
+      if (barLabelEl) barLabelEl.textContent = `${completed} / ${total} COMPLETADOS`;
+      if (mainBarEl) mainBarEl.style.width = `${pct}%`;
+
+      if (victoryLogEl) {
+        if (pct === 100) {
+          victoryLogEl.innerHTML = `<span class="text-[#00FFCC] font-bold">¡OPERACIÓN ÉLITE COMPLETADA! Todos los objetivos han sido conquistados. Racha asegurada.</span>`;
+        } else if (pct > 0) {
+          victoryLogEl.innerHTML = `En progreso: <span class="text-white font-bold">${completed} de ${total}</span> tareas completadas hoy. ¡Mantén la disciplina!`;
+        } else {
+          victoryLogEl.textContent = 'No se han registrado victorias de racha aún hoy. Completa tus objetivos para activar el protocolo de recompensa.';
+        }
+      }
+    }
+
+    // 2. CELEBRACIÓN DE VICTORIA MONUMENTAL (MODAL POP + CONFETTI)
+    function triggerEpicVictoryModal() {
+      const backdrop = document.getElementById('victory-modal-backdrop');
+      const xpBar = document.getElementById('modal-xp-bar');
+      const xpCounter = document.getElementById('modal-xp-counter');
+
+      if (!backdrop) return;
+
+      if (xpBar) xpBar.style.width = '65%';
+      if (xpCounter) xpCounter.textContent = '400 / 600 XP';
+
+      backdrop.classList.add('active');
+
+      if (typeof confetti === 'function') {
+        confetti({
+          particleCount: 100,
+          spread: 100,
+          origin: { y: 0.6 },
+          colors: ['#00F0FF', '#FFB800', '#00FFCC', '#FFFFFF']
+        });
+
+        setTimeout(() => {
+          confetti({
+            particleCount: 60,
+            angle: 60,
+            spread: 70,
+            origin: { x: 0 },
+            colors: ['#00F0FF', '#00FFCC', '#FFB800']
+          });
+          confetti({
+            particleCount: 60,
+            angle: 120,
+            spread: 70,
+            origin: { x: 1 },
+            colors: ['#00F0FF', '#00FFCC', '#FFB800']
+          });
+        }, 350);
+      }
+
+      setTimeout(() => {
+        if (xpBar) xpBar.style.width = '100%';
+        if (xpCounter) xpCounter.textContent = '600 / 600 XP (¡NIVEL ALCANZADO!)';
+        
+        const sidebarBar = document.getElementById('sidebar-xp-bar');
+        const sidebarText = document.getElementById('sidebar-xp-text');
+        if (sidebarBar) sidebarBar.style.width = '100%';
+        if (sidebarText) sidebarText.textContent = '600 / 600 XP';
+      }, 300);
+    }
+
+    function closeVictoryModal() {
+      const backdrop = document.getElementById('victory-modal-backdrop');
+      if (backdrop) backdrop.classList.remove('active');
+    }
+
+    // 3. GUARDAR MÓDULO DEPORTE Y KILOMETRAJE
+    function saveSportsData() {
+      const kmVal = document.getElementById('sports-km').value.trim() || '0.0';
+      const minVal = document.getElementById('sports-time').value.trim() || '0';
+
+      localStorage.setItem('check_sports_km', kmVal);
+      localStorage.setItem('check_sports_min', minVal);
+
+      updateSportsBadge(kmVal, minVal);
+
+      const btn = document.querySelector('button[onclick="saveSportsData()"]');
+      if (btn) {
+        const originalText = btn.innerHTML;
+        btn.innerHTML = `<i data-lucide="check" class="w-4 h-4 text-[#00FFCC]"></i> <span class="text-[#00FFCC]">¡GUARDADO CON ÉXITO!</span>`;
+        lucide.createIcons();
+        setTimeout(() => {
+          btn.innerHTML = originalText;
+          lucide.createIcons();
+        }, 1800);
+      }
+    }
+
+    function updateSportsBadge(km, min) {
+      const badge = document.getElementById('sports-summary-badge');
+      if (badge) {
+        badge.textContent = `${km} km · ${min} min hoy`;
+      }
+    }
+
+    // 4. FOCUS TÁCTICO TIMER
+    function updateFocusDisplay() {
+      const displayEl = document.getElementById('focus-timer-display');
+      if (!displayEl) return;
+      const m = Math.floor(focusTimeRemaining / 60);
+      const s = focusTimeRemaining % 60;
+      displayEl.textContent = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    }
+
+    function toggleFocusTimer() {
+      const startBtn = document.getElementById('focus-start-btn');
+      const statusEl = document.getElementById('focus-status-text');
+      const clockIcon = document.getElementById('focus-clock-icon');
+
+      if (isFocusRunning) {
+        clearInterval(focusTimerInterval);
+        isFocusRunning = false;
+        if (startBtn) startBtn.innerHTML = '▶ [ CONTINUAR FOCUS ]';
+        if (statusEl) statusEl.textContent = 'CRONÓMETRO EN PAUSA';
+        if (clockIcon) clockIcon.classList.remove('animate-spin');
+      } else {
+        if (focusTimeRemaining <= 0) {
+          const focusMinInput = document.getElementById('focus-min-input');
+          const val = focusMinInput ? parseInt(focusMinInput.value, 10) || 25 : 25;
+          focusTimeRemaining = val * 60;
+        }
+
+        isFocusRunning = true;
+        if (startBtn) startBtn.innerHTML = '⏸ [ PAUSAR FOCUS ]';
+        if (statusEl) statusEl.textContent = '⚡ ENFOQUE TÁCTICO EN PROGRESO';
+        if (clockIcon) clockIcon.classList.add('animate-spin');
+
+        focusTimerInterval = setInterval(() => {
+          focusTimeRemaining--;
+          updateFocusDisplay();
+
+          if (focusTimeRemaining <= 0) {
+            clearInterval(focusTimerInterval);
+            isFocusRunning = false;
+            if (startBtn) startBtn.innerHTML = '🔄 [ REINICIAR FOCUS ]';
+            if (statusEl) statusEl.textContent = '¡SESIÓN DE ENFOQUE COMPLETADA!';
+            if (clockIcon) clockIcon.classList.remove('animate-spin');
+
+            if (typeof confetti === 'function') {
+              confetti({ particleCount: 70, spread: 80, origin: { y: 0.5 } });
+            }
+          }
+        }, 1000);
+      }
+    }
+
+    function resetFocusTimer() {
+      clearInterval(focusTimerInterval);
+      isFocusRunning = false;
+      const focusMinInput = document.getElementById('focus-min-input');
+      const val = focusMinInput ? parseInt(focusMinInput.value, 10) || 25 : 25;
+      focusTimeRemaining = val * 60;
+      updateFocusDisplay();
+
+      const startBtn = document.getElementById('focus-start-btn');
+      const statusEl = document.getElementById('focus-status-text');
+      const clockIcon = document.getElementById('focus-clock-icon');
+
+      if (startBtn) startBtn.innerHTML = '▶ [ INICIAR FOCUS ]';
+      if (statusEl) statusEl.textContent = 'LISTO PARA INICIAR';
+      if (clockIcon) clockIcon.classList.remove('animate-spin');
+    }
+
+    // GESTIÓN DE MODALES DE TAREAS
+    function openAddTaskModal() {
+      const modal = document.getElementById('add-task-modal');
+      if (modal) modal.classList.add('active');
+    }
+
+    function closeAddTaskModal() {
+      const modal = document.getElementById('add-task-modal');
+      if (modal) {
+        modal.classList.remove('active');
+        document.getElementById('new-task-name').value = '';
+      }
+    }
+
+    function addNewTask() {
+      const nameInput = document.getElementById('new-task-name');
+      const catSelect = document.getElementById('new-task-category');
+
+      const title = nameInput.value.trim();
+      if (!title) {
+        alert('Por favor escribe el nombre de la tarea.');
+        return;
+      }
+
+      const newTask = {
+        id: Date.now().toString(),
+        title: title,
+        category: catSelect.value || 'MENTE',
+        completed: false
+      };
+
+      tasks.unshift(newTask);
+      saveTasks();
+      renderTasks();
+      updateProgressUI();
+      closeAddTaskModal();
+    }
+  </script>
+</body>
+</html>
